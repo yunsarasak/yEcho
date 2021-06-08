@@ -59,8 +59,8 @@ int main(int argc, char* argv[]){
 										}
 										else
 										{
-												printf("recv : %s\n", buf);
-												send(i, buf, str_len, 0);	//echo
+												SEND_MSG(i, "%d:%s", i, buf);		//echo
+												printf("%d: recv : %s\n", i, buf);
 										}
 								}// if other socket is changed, read data.
 						}

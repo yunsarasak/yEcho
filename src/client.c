@@ -1,71 +1,42 @@
 #include "../lib/yEcho.h"
 
-void *SendRecvFunc(void* _socket_fd)
+void* sendFunc(void* _sock_fd)
 {
-		int socket_fd = *(int*)_socket_fd;
-		char msg[1024];
-		char buffer[1024];
-		int recv_len;
+		int socket_fd = *(int*)_sock_fd;
+
 		while(1){
-				//send
-				if( fgets(msg, sizeof(msg), stdin) != NULL){
-						if(send(socket_fd, msg, strlen(msg), 0) < 0){
-								perror("send :");
-								return NULL;
-						}
-				}
-				//recv
-				if((recv_len = recv(socket_fd, buffer, 1024, 0)) < 0){
-						perror("receive :");
-						return (void*)-1;
-				}
 
-				buffer[recv_len] = '\0';
-
-				printf("received msg : %s\n", buffer);
-				memset(buffer, 0x00, 1024);
-				memset(msg, 0x00, 1024);
+				SEND_MSG(socket_fd, "hello, TCP! %d speaking", socket_fd);
+				poll(NULL, 0, 1000);
 		}
-
-		return NULL;
 }
 
-int main(void)
+void* recvFunc(void* _sock_fd)
 {
-		
-		int sock;
-		char buffer[1024];
-		const char *msg = "hellow, world! from client2\n";
-		int recv_len;
+		int socket_fd = *(int*)_sock_fd;
 
-		pthread_t thread_send_recv;
-		
-		if((sock = InitClient("127.0.0.1", 7777)) < 0){
-				printf("client init fail : %d, %s\n", errno, strerror(errno));
-				return -1;
-		}
+		PrintWhenRecv(socket_fd);
 
-		if(pthread_create(&thread_send_recv, NULL, SendRecvFunc, (void*)&sock) != 0){
-				printf("socket : %d, %s\n", errno, strerror(errno));
-				return -2;
-		}
+}
+
+int main()
+{
+		int socket_fd;
+		socket_fd = InitClient("127.0.0.1", PORT);
+
+		pthread_t thread_send, thread_recv;
+
+		pthread_create(&thread_send, NULL, sendFunc, (void*)&socket_fd);
+		pthread_create(&thread_recv, NULL, recvFunc, (void*)&socket_fd);
 
 		while(1){
-			poll(NULL, 0, 1000);
+				poll(NULL, 0, 1000 * 10);
 		}
 
-		if((recv_len = recv(sock, buffer, 1024, 0)) < 0){
-				perror("receive :");
-				return -4;
-		}
-
-		buffer[recv_len] = '\0';
-
-		printf("received msg : %s\n", buffer);
-
-		close(sock);
-
+		close(socket_fd);
 
 		return 0;
 }
+
+
 

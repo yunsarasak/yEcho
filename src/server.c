@@ -1,37 +1,75 @@
-#include "../lib/yEcho.h"
+#include "yEcho.h"
 
-int main(void){
-		int sock, client_sock;
-		struct sockaddr_in addr, client_addr;
-		char buffer[1024];
-		int len, addr_len, recv_len;
+int main(int argc, char* argv[]){
+		int serv_sock, clnt_sock;
+		struct sockaddr_in clnt_addr;
+		struct timeval timeout;
+		fd_set reads, cpy_reads;
 
-		sock = InitServer(7777);
+		socklen_t addr_size;
+		int fd_max, str_len, fd_num, i;
 
-		addr_len = sizeof(client_addr);
-
-		printf("waiting for client..\n");
-		
-
-		while((client_sock = accept(sock, (struct sockaddr *)&client_addr, &addr_len)) > 0){
-				printf("client ip : %s\n", inet_ntoa(client_addr.sin_addr));
-				
-				while(1){
-						if((recv_len = recv(client_sock, buffer, 1024, 0)) < 0){
-								printf("recv : %d, %s\n", errno, strerror(errno));
-								return -4;
-						}
-
-						buffer[recv_len] = '\0';
-						printf("received data : %s\n", buffer);
-						send(client_sock, buffer, strlen(buffer), 0);
-				}
-
-				close(client_sock);
+		if((serv_sock = InitServer(PORT)) < 0){
+				printf("InitServer %d %s", errno, strerror(errno));
+				return serv_sock;
 		}
 
-		close(sock);
+		FD_ZERO(&reads);// initialize fd_set
+		FD_SET(serv_sock, &reads);// add server socket into read fd set
+		fd_max = serv_sock;//max file descriptor
 
+		while(1)
+		{
+				cpy_reads = reads;		//copy origin
+				timeout.tv_sec = 5;
+				timeout.tv_usec = 5000;	//set timeout
 
+				if((fd_num = select(fd_max+1, &cpy_reads, 0, 0, &timeout)) == -1){
+						break;
+				}//there is only server socket in the set yet, so when receive connect request, data insert into server socket
+
+				if(fd_num == 0){
+						continue;
+				}// if time out, continue
+
+				for(i = 0; i < fd_max+1; i++){
+						if(FD_ISSET(i, &cpy_reads))
+						{
+								if( i == serv_sock)
+								{
+										addr_size = sizeof(clnt_addr);
+										clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &addr_size);
+										FD_SET(clnt_sock, &reads);
+										if(fd_max < clnt_sock)
+										{
+												fd_max = clnt_sock;
+										}
+										printf("connect client %d\n", clnt_sock);
+								}// if server socket is changed , it means there is connect request
+								else
+								{
+										char buf[BUF_SIZE];
+										str_len = recv(i, buf, BUF_SIZE, 0);
+										buf[str_len] = '\0';
+										if(str_len == 0) //close request
+										{
+												FD_CLR(i, &reads);
+												close(i);
+												printf("closed client %d\n", i);
+										}
+										else
+										{
+												printf("recv : %s\n", buf);
+												send(i, buf, str_len, 0);	//echo
+										}
+								}// if other socket is changed, read data.
+						}
+				}
+		}
+
+		close(serv_sock);
 		return 0;
+
+
+
 }

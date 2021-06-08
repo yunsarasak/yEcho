@@ -8,8 +8,65 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
+
+pthread_mutex_t mutex_fd;
 
 char* make_message(const char *fmt, ...);
+
+void* sendFunc(void* _sock_fd)
+{
+		int iDs = *(int*)_sock_fd;
+		char mybuff[1024];
+
+
+		while(1){
+
+				memset(mybuff, 0x00, sizeof(mybuff));
+				char* msg = make_message("%s, %d", "hello, ", iDs);
+				pthread_mutex_lock(&mutex_fd);			
+				send(iDs, msg, strlen(msg), 0);
+				pthread_mutex_unlock(&mutex_fd);
+
+				printf("send str!\n");
+				poll(NULL, 0, 1000);
+		}
+}
+
+void* recvFunc(void* _sock_fd)
+{
+		int iDs = *(int*)_sock_fd;
+		char myrbuff[1024];
+		fd_set rfds, copy_rfds;
+		struct timeval tv;
+		int retval;
+		int recv_length;
+
+		FD_ZERO(&rfds);
+		FD_SET(iDs, &rfds);
+
+		tv.tv_sec = 5;
+		tv.tv_usec = 0;
+
+		while(1){
+				copy_rfds = rfds;
+				retval = select(iDs+1, &copy_rfds, NULL, NULL, &tv);
+
+				if(retval == -1){
+						continue;
+				}else if(retval == 0){
+						continue;
+				}else{
+						memset(myrbuff, 0x00, sizeof(myrbuff));
+						pthread_mutex_lock(&mutex_fd);
+						recv_length = recv(iDs , myrbuff, sizeof(myrbuff), 0);
+						myrbuff[recv_length] = '\0';
+						pthread_mutex_unlock(&mutex_fd);
+
+						printf("%s\n", myrbuff);	
+				}
+		}
+}
 
 int main()
 {
@@ -47,24 +104,17 @@ int main()
 				return -10;
 		}
 
+
+		pthread_mutex_init(&mutex_fd, NULL);
+
+		//pthread_t thread_loop;
+		pthread_t thread_send, thread_recv;
+		//pthread_create(&thread_loop, NULL, whileFunc, (void*)&iDs);
+		pthread_create(&thread_send, NULL, sendFunc, (void*)&iDs);
+		pthread_create(&thread_recv, NULL, recvFunc, (void*)&iDs);
+
 		while(1){
-				char mybuff[256];
-				char myrbuff[256];
-				memset(mybuff, 0x00, sizeof(mybuff));
-				char key1;
-//				scanf("%c", &key1);
-//				while(getchar != '\n');
-
-				//char* msg = make_message("%s", "this is the test");
-
-				fgets(mybuff, sizeof(mybuff), stdin);
-
-				send(iDs, mybuff, strlen(mybuff), 0);
-				recv(iDs, myrbuff, sizeof(myrbuff), 0);
-				//write(iDs, mybuff, mylen);
-				//iRet = read(iDs, ucBuf, sizeof(ucBuf));
-				//ucBuf[iRet] = 0;
-				printf("%s\n", myrbuff);
+				poll(NULL, 0, 1000 * 10);
 		}
 
 		close(iDs);

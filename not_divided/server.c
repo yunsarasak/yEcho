@@ -70,6 +70,7 @@ int main(int argc, char* argv[]){
 								{
 										char buf[BUF_SIZE];
 										str_len = read(i, buf, BUF_SIZE);
+										buf[str_len] = '\0';
 										if(str_len == 0) //close request
 										{
 												FD_CLR(i, &reads);
@@ -78,6 +79,7 @@ int main(int argc, char* argv[]){
 										}
 										else
 										{
+												printf("recv : %s\n", buf);
 												write(i, buf, str_len);	//echo
 										}
 								}// if other socket is changed, read data.
